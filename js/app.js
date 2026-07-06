@@ -285,6 +285,8 @@ function renderSignupForm(){
 
 /* =========================================================
    TOPBAR
+
+   <button class="btn btn-outline btn-sm" data-action="home">Home</button> add on before current home and change the home to back :)
    ========================================================= */
 function renderTopbar(){
   const u = state.currentUser;
@@ -293,6 +295,8 @@ function renderTopbar(){
   <div class="topbar">
     <div class="brand"><span class="dot"></span>STUBLINE</div>
     <div class="nav-right">
+       
+      <button class="btn btn-outline btn-sm" data-action="back">Home</button>
       <span class="role-badge ${u.role==='admin'?'admin':u.role==='organizer'?'organizer':'attendee'}">${roleLabel}</span>
       <span style="font-size:14px;">${escapeHtml(u.name)}</span>
       <button class="btn btn-outline btn-sm" data-action="logout">Log out</button>
@@ -672,6 +676,8 @@ function attachHandlers(){
     else if(action==='open-signup'){ state.showAuth=true; state.authTab='signup'; state.formError=null; render(); }
     else if(action==='auth-tab'){ state.authTab = el.dataset.tab; state.formError=null; render(); }
     else if(action==='pick-role'){ state.signupRole = el.dataset.role; render(); }
+    else if(action==='home'){ goHome(); }
+    else if(action==='back'){ goBack(); }
     else if(action==='logout'){ clearSession(); state.showAuth=false; state.formError=null; render(); }
     else if(action==='user-tab'){ state.userTab = el.dataset.tab; render(); }
     else if(action==='org-tab'){ state.orgTab = el.dataset.tab; render(); }
@@ -712,6 +718,24 @@ function attachHandlers(){
   if(searchInput){
     searchInput.oninput = ()=>{ state.searchTerm = searchInput.value; render(); searchInput2Focus(); };
   }
+}
+
+function goHome(){
+  state.formError = null;
+  state.modal = null;
+  if(!state.currentUser){ state.showAuth = false; render(); return; }
+  if(state.currentUser.role === 'admin') state.adminTab = 'overview';
+  else if(state.currentUser.role === 'organizer') state.orgTab = 'events';
+  else state.userTab = 'browse';
+  render();
+}
+
+function goBack(){
+  state.formError = null;
+  state.modal = null;
+  clearSession();
+  state.showAuth = false;
+  render();
 }
 
 // keep focus in search box after re-render while typing
