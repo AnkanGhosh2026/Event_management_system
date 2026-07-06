@@ -16,6 +16,49 @@ const CATEGORIES = [
   {id:'other', label:'Other', icon:'🎫'}
 ];
 
+const EVENT_IMAGE_LIBRARY = {
+  music: [
+    'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=900&q=80'
+  ],
+  birthday: [
+    'https://images.unsplash.com/photo-1464349153735-7db50ed83c84?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=900&q=80'
+  ],
+  comedy: [
+    'https://images.unsplash.com/photo-1527224857830-43a7acc85260?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1560439514-4e9645039924?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1543584756-31b1d17fcb93?auto=format&fit=crop&w=900&q=80'
+  ],
+  sports: [
+    'https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1521412644187-c49fa049e84d?auto=format&fit=crop&w=900&q=80'
+  ],
+  cricket: [
+    'https://loremflickr.com/900/520/cricket,batsman?lock=721',
+    'https://loremflickr.com/900/520/cricket,stadium?lock=722',
+    'https://loremflickr.com/900/520/cricket,wicket?lock=723'
+  ],
+  conference: [
+    'https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=900&q=80'
+  ],
+  festival: [
+    'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1467810563316-b5476525c0f9?auto=format&fit=crop&w=900&q=80'
+  ],
+  other: [
+    'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=900&q=80',
+    'https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&w=900&q=80'
+  ]
+};
+
 /* ---------- storage helpers ---------- */
 function loadDB(key){ try{ return JSON.parse(localStorage.getItem(key)) || []; }catch(e){ return []; } }
 function saveDB(key, data){ localStorage.setItem(key, JSON.stringify(data)); }
@@ -26,6 +69,31 @@ function uid(prefix){ return prefix + '_' + Date.now().toString(36) + Math.rando
 function fmtDate(d){ try{ return new Date(d+'T00:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }catch(e){ return d; } }
 function catInfo(id){ return CATEGORIES.find(c=>c.id===id) || CATEGORIES[CATEGORIES.length-1]; }
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function hashString(s){
+  return (s || '').split('').reduce((hash, ch)=>((hash << 5) - hash + ch.charCodeAt(0)) | 0, 0);
+}
+function eventImageFor(e){
+  const title = (e.title || '').toLowerCase();
+  let category = e.category || 'other';
+  if(/cricket|batsman|batting|bowler|wicket|innings|ipl|t20/.test(title)) category = 'cricket';
+  else if(/football|soccer|cup|match|tournament|sport|tennis|badminton|basketball/.test(title)) category = 'sports';
+  else if(/dev|frontend|conference|summit|workshop|tech/.test(title)) category = 'conference';
+  else if(/laugh|comedy|comic|stand.?up|mic/.test(title)) category = 'comedy';
+  else if(/birthday|party|bash|cake/.test(title)) category = 'birthday';
+  else if(/music|indie|concert|band|acoustic|live/.test(title)) category = 'music';
+  else if(/festival|food|craft|harvest|fair/.test(title)) category = 'festival';
+  const images = EVENT_IMAGE_LIBRARY[category] || EVENT_IMAGE_LIBRARY.other;
+  return images[Math.abs(hashString(`${e.id}-${e.title}-${e.venue}`)) % images.length];
+}
+function eventImageFallbackFor(e){
+  if(/cricket|batsman|batting|bowler|wicket|innings|ipl|t20/.test((e.title || '').toLowerCase())){
+    return 'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=900&q=80';
+  }
+  return EVENT_IMAGE_LIBRARY.other[0];
+}
+function eventImageAlt(e){
+  return `${catInfo(e.category).label} image for ${e.title || 'event'}`;
+}
 
 /* ---------- seed data (only runs once) ---------- */
 function seedIfEmpty(){
@@ -110,6 +178,8 @@ function renderPublicHome(){
   const events = loadDB(DB_KEYS.events).filter(e=>e.published);
   const totalTickets = events.reduce((sum,e)=>sum + Math.max(0, e.availableTickets), 0);
   const nextEvent = events.slice().sort((a,b)=>a.date.localeCompare(b.date))[0];
+  const nextImage = nextEvent ? eventImageFor(nextEvent) : EVENT_IMAGE_LIBRARY.other[0];
+  const nextFallback = nextEvent ? eventImageFallbackFor(nextEvent) : EVENT_IMAGE_LIBRARY.other[0];
   return `
   ${renderPublicTopbar()}
   <section class="attendee-hero">
@@ -123,6 +193,9 @@ function renderPublicHome(){
       </div>
     </div>
     <div class="hero-ticket">
+      <div class="hero-ticket-media">
+        <img src="${nextImage}" alt="${escapeHtml(nextEvent ? eventImageAlt(nextEvent) : 'Event crowd image')}" onerror="this.onerror=null;this.src='${nextFallback}'">
+      </div>
       <span class="stub-cat">NEXT UP</span>
       <h3>${nextEvent ? escapeHtml(nextEvent.title) : 'Published events coming soon'}</h3>
       <div class="stub-meta">
@@ -283,9 +356,13 @@ function renderEventStub(e, opts={}){
   const cat = catInfo(e.category);
   const soldOut = e.availableTickets <= 0;
   const low = !soldOut && e.availableTickets <= Math.max(5, Math.round(e.totalTickets*0.1));
+  const image = eventImageFor(e);
   return `
   <div class="stub">
     ${opts.showDraft && !e.published ? `<span class="status-tag draft">DRAFT</span>` : soldOut ? `<span class="status-tag soldout">SOLD OUT</span>` : ''}
+    <div class="stub-media">
+      <img src="${image}" alt="${escapeHtml(eventImageAlt(e))}" loading="lazy" onerror="this.onerror=null;this.src='${eventImageFallbackFor(e)}'">
+    </div>
     <div class="stub-top">
       <span class="stub-code">#${e.id.slice(-5).toUpperCase()}</span>
       <span class="stub-cat">${cat.icon} ${cat.label}</span>
@@ -317,9 +394,13 @@ function renderMyBookings(){
     const e = events.find(ev=>ev.id===b.eventId);
     if(!e) return '';
     const cat = catInfo(e.category);
+    const image = eventImageFor(e);
     return `
     <div class="stub">
       <span class="stub-code">#${b.id.slice(-5).toUpperCase()}</span>
+      <div class="stub-media">
+        <img src="${image}" alt="${escapeHtml(eventImageAlt(e))}" loading="lazy" onerror="this.onerror=null;this.src='${eventImageFallbackFor(e)}'">
+      </div>
       <div class="stub-top">
         <span class="stub-cat">${cat.icon} ${cat.label}</span>
         <h3 class="stub-title">${escapeHtml(e.title)}</h3>
@@ -366,6 +447,9 @@ function renderOrgEvents(myEvents){
   return `<div class="event-grid">${myEvents.map(e=>`
     <div class="stub">
       <span class="status-tag ${e.published?'':'draft'}">${e.published?'PUBLISHED':'DRAFT'}</span>
+      <div class="stub-media">
+        <img src="${eventImageFor(e)}" alt="${escapeHtml(eventImageAlt(e))}" loading="lazy" onerror="this.onerror=null;this.src='${eventImageFallbackFor(e)}'">
+      </div>
       <div class="stub-top">
         <span class="stub-cat">${catInfo(e.category).icon} ${catInfo(e.category).label}</span>
         <h3 class="stub-title">${escapeHtml(e.title)}</h3>
@@ -514,10 +598,14 @@ function renderEventDetailModal(eventId){
   if(!e) return '';
   const cat = catInfo(e.category);
   const soldOut = e.availableTickets<=0;
+  const image = eventImageFor(e);
   return `
   <div class="modal-overlay" data-action="close-modal">
     <div class="modal" onclick="event.stopPropagation()">
       <button class="modal-close" data-action="close-modal">✕</button>
+      <div class="modal-media">
+        <img src="${image}" alt="${escapeHtml(eventImageAlt(e))}" onerror="this.onerror=null;this.src='${eventImageFallbackFor(e)}'">
+      </div>
       <span class="stub-cat">${cat.icon} ${cat.label}</span>
       <h3>${escapeHtml(e.title)}</h3>
       <div class="stub-meta" style="margin-bottom:14px;">
