@@ -59,6 +59,7 @@ seedIfEmpty();
 /* ---------- app state ---------- */
 let state = {
   currentUser: null,
+  showAuth: false,
   authTab: 'login',
   signupRole: 'attendee',
   userTab: 'browse',
@@ -84,11 +85,68 @@ function render(){
   const app = document.getElementById('app');
   state.currentUser = currentUserObj();
   if(!state.currentUser){
-    app.innerHTML = renderAuthScreen();
+    app.innerHTML = state.showAuth ? renderAuthScreen() : renderPublicHome();
   } else {
     app.innerHTML = renderTopbar() + '<div class="main">' + renderMainContent() + '</div>' + renderModal() + renderFooter();
   }
   attachHandlers();
+}
+
+/* =========================================================
+   PUBLIC ATTENDEE HOME
+   ========================================================= */
+function renderPublicTopbar(){
+  return `
+  <div class="topbar public-topbar">
+    <div class="brand"><span class="dot"></span>STUBLINE</div>
+    <div class="nav-right">
+      <button class="btn btn-outline btn-sm" data-action="open-login">Log in</button>
+      <button class="btn btn-primary btn-sm" data-action="open-signup">Sign up</button>
+    </div>
+  </div>`;
+}
+
+function renderPublicHome(){
+  const events = loadDB(DB_KEYS.events).filter(e=>e.published);
+  const totalTickets = events.reduce((sum,e)=>sum + Math.max(0, e.availableTickets), 0);
+  const nextEvent = events.slice().sort((a,b)=>a.date.localeCompare(b.date))[0];
+  return `
+  ${renderPublicTopbar()}
+  <section class="attendee-hero">
+    <div class="hero-panel">
+      <div class="eyebrow">Live events, local seats, easy booking</div>
+      <h1>Find something worth showing up for.</h1>
+      <p>Browse published events from organizers on STUBLINE. Open any event, pick your tickets, and log in only when you are ready to book.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#events-section">Browse events</a>
+        <button class="btn btn-outline" data-action="open-login">Log in to book</button>
+      </div>
+    </div>
+    <div class="hero-ticket">
+      <span class="stub-cat">NEXT UP</span>
+      <h3>${nextEvent ? escapeHtml(nextEvent.title) : 'Published events coming soon'}</h3>
+      <div class="stub-meta">
+        ${nextEvent ? `${fmtDate(nextEvent.date)} at ${nextEvent.time}<br>${escapeHtml(nextEvent.venue)}` : 'Organizers can publish events from their dashboard.'}
+      </div>
+      <div class="hero-ticket-line"></div>
+      <div class="hero-ticket-bottom">
+        <span>${events.length} published</span>
+        <strong>${totalTickets} seats open</strong>
+      </div>
+    </div>
+  </section>
+  <main class="main public-main" id="events-section">
+    <div class="section-head">
+      <div>
+        <h2>Published events</h2>
+        <div class="sub">Concerts, comedy, conferences, sports and celebrations ready for attendees.</div>
+      </div>
+      <button class="btn btn-ghost" data-action="open-signup">Create attendee account</button>
+    </div>
+    ${renderBrowseEvents()}
+  </main>
+  ${renderModal()}
+  ${renderFooter()}`;
 }
 
 /* =========================================================
@@ -522,9 +580,11 @@ function attachHandlers(){
     if(!el) return;
     const action = el.dataset.action;
 
-    if(action==='auth-tab'){ state.authTab = el.dataset.tab; state.formError=null; render(); }
+    if(action==='open-login'){ state.showAuth=true; state.authTab='login'; state.formError=null; render(); }
+    else if(action==='open-signup'){ state.showAuth=true; state.authTab='signup'; state.formError=null; render(); }
+    else if(action==='auth-tab'){ state.authTab = el.dataset.tab; state.formError=null; render(); }
     else if(action==='pick-role'){ state.signupRole = el.dataset.role; render(); }
-    else if(action==='logout'){ clearSession(); state.formError=null; render(); }
+    else if(action==='logout'){ clearSession(); state.showAuth=false; state.formError=null; render(); }
     else if(action==='user-tab'){ state.userTab = el.dataset.tab; render(); }
     else if(action==='org-tab'){ state.orgTab = el.dataset.tab; render(); }
     else if(action==='admin-tab'){ state.adminTab = el.dataset.tab; render(); }
@@ -580,6 +640,7 @@ function handleLogin(fd){
   const u = users.find(us=>us.email.toLowerCase()===email && us.password===password);
   if(!u){ state.formError = 'Incorrect email or password.'; render(); return; }
   setSession(u.id);
+  state.showAuth=false;
   state.formError=null;
   render();
 }
@@ -596,6 +657,7 @@ function handleSignup(fd){
   users.push(newUser);
   saveDB(DB_KEYS.users, users);
   setSession(newUser.id);
+  state.showAuth=false;
   state.formError=null;
   render();
 }
@@ -649,6 +711,14 @@ function deleteEventAsOrganizer(eventId){
 
 /* ---------- attendee actions ---------- */
 function handleBooking(fd, eventId){
+  if(!state.currentUser){
+    state.modal = null;
+    state.showAuth = true;
+    state.authTab = 'login';
+    state.formError = 'Please log in or create an attendee account to book this event.';
+    render();
+    return;
+  }
   const qty = Math.max(1, parseInt(fd.get('qty'),10)||1);
   let events = loadDB(DB_KEYS.events);
   const idx = events.findIndex(e=>e.id===eventId);
